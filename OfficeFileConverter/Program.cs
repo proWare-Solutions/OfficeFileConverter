@@ -23,6 +23,7 @@ using WordDoc = Microsoft.Office.Interop.Word.Document;
 using VisioDoc = Microsoft.Office.Interop.Visio.Document;
 using Microsoft.Office.Interop.Access.Dao;
 using System.Net.NetworkInformation;
+using System.Globalization;
 
 namespace OfficeFileConverter
 {
@@ -152,6 +153,29 @@ namespace OfficeFileConverter
         _access.Visible = false;
       }
     }
+
+    static bool IsFileLocked(string path)
+    {
+      try
+      {
+        using (FileStream stream = new FileStream(path,FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+          stream.Close();
+        }
+      }
+      catch (IOException)
+      {
+        //the file is unavailable because it is:
+        //still being written to
+        //or being processed by another thread
+        //or does not exist (has already been processed)
+        return true;
+      }
+
+      //file is not locked
+      return false;
+    }
+
     static void ProcessFile(string filePath)
     {
       try
@@ -170,10 +194,15 @@ namespace OfficeFileConverter
         if (ext != null && ext.Action == ConvertAction.Convert)
         {
           Log.Information($"Processing file '{filePath}'");
-          
+          if (IsFileLocked(filePath))
+          {
+            Log.Information($"File {filePath} is in use and cannot be processed");
+            return;
+          }
           _options.FilesProcessed++;
           string fileExt = ext.Extension.ToLower(); // Endung
           string fileName = Path.GetFileName(filePath); //Dateiname
+          if (fileName.StartsWith("~$")) return; // Lock-File for a file in use
           string tmpPath = Path.Combine(_options.TempDir, fileName); //Temporärer Pfad
           string fileWihoutExt = Path.GetFileNameWithoutExtension(fileName); //Dateiname ohne Endung
           string tmpTargetPath = tmpTargetPath = Path.Combine(_options.TempDir, fileWihoutExt); // Temporärer Zielpfad ohen Endung
