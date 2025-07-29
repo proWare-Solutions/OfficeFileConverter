@@ -209,6 +209,7 @@ namespace OfficeFileConverter
           string targetPath = Path.Combine(Path.GetDirectoryName(filePath), fileWihoutExt);
           Log.Debug("Copying file to temporary directory");
           File.Copy(filePath, tmpPath, true);
+          bool fileChanged = false;
           try
           {
             switch (fileExt)
@@ -225,7 +226,7 @@ namespace OfficeFileConverter
                       tmpTargetPath += ".pdf";
                       targetPath += ".pdf";
                       doc.SaveAs2(tmpTargetPath, WdSaveFormat.wdFormatPDF);
-                     
+                      fileChanged = true;
                     }
                     else
                     {
@@ -234,19 +235,21 @@ namespace OfficeFileConverter
                         tmpTargetPath += ".docm";
                         targetPath += ".docm";
                         doc.SaveAs2(tmpTargetPath, WdSaveFormat.wdFormatXMLDocumentMacroEnabled);
+                        fileChanged = true;
                       }
-                      else
+                      else if (_options.AllFiles)
                       {
                         tmpTargetPath += ".docx";
                         targetPath += ".docx";
                         doc.SaveAs2(tmpTargetPath, WdSaveFormat.wdFormatXMLDocument);
+                        fileChanged = true;
                       }
                     }
                     try
                     {
                       doc.Close(false);
                       doc = null;
-                      File.Copy(tmpTargetPath, targetPath, true);
+                      if (fileChanged && !ext.TargetIsPDF) File.Copy(tmpTargetPath, targetPath, true);
                     }
                     catch (Exception ex)
                     {
@@ -264,7 +267,7 @@ namespace OfficeFileConverter
                   finally { 
                     if (doc!= null) doc.Close(false); 
                   }
-                  if (_options.RemoveOriginal)
+                  if (_options.RemoveOriginal && fileChanged)
                   {
                     try
                     {
@@ -289,6 +292,7 @@ namespace OfficeFileConverter
                       tmpTargetPath += ".pdf";
                       targetPath += ".pdf";
                       doc.SaveAs2(tmpTargetPath, WdSaveFormat.wdFormatPDF);
+                      fileChanged = true;
                     }
                     else
                     {
@@ -297,19 +301,21 @@ namespace OfficeFileConverter
                         tmpTargetPath += ".dotm";
                         targetPath += ".dotm";
                         doc.SaveAs2(tmpTargetPath, WdSaveFormat.wdFormatFlatXMLTemplateMacroEnabled);
+                        fileChanged = true;
                       }
-                      else
+                      else if (_options.AllFiles)
                       {
                         tmpTargetPath += ".dotx";
                         targetPath += ".dotx";
                         doc.SaveAs2(tmpTargetPath, WdSaveFormat.wdFormatFlatXMLTemplate);
+                        fileChanged = true;
                       }
                     }
                     try
                     {
                       doc.Close(false);
                       doc = null;
-                      File.Copy(tmpTargetPath, targetPath, true);
+                      if (fileChanged && !ext.TargetIsPDF) File.Copy(tmpTargetPath, targetPath, true);
                     }
                     catch (Exception ex)
                     {
@@ -328,7 +334,7 @@ namespace OfficeFileConverter
                   {
                     if (doc!=null) doc.Close(false);
                   }
-                  if (_options.RemoveOriginal)
+                  if (_options.RemoveOriginal && fileChanged)
                   {
                     try
                     {
@@ -366,6 +372,7 @@ namespace OfficeFileConverter
                         File.Copy(tmpTargetPath + target, targetPath + target);
                         File.Delete(tmpTargetPath + target);
                       }
+                      fileChanged = true;
                     }
                     else
                     {
@@ -374,18 +381,20 @@ namespace OfficeFileConverter
                         tmpTargetPath += ".xlsm";
                         targetPath += ".xlsm";
                         wb.SaveAs(tmpTargetPath, XlFileFormat.xlOpenXMLWorkbookMacroEnabled);
+                        fileChanged = true;
                       }
-                      else
+                      else if (_options.AllFiles)
                       {
                         tmpTargetPath += ".xlsx";
                         targetPath += ".xlsx";
                         wb.SaveAs(tmpTargetPath, XlFileFormat.xlOpenXMLWorkbook);
+                        fileChanged = true;
                       }
                       try
                       {
                         wb.Close(false);
                         wb = null;
-                        File.Copy(tmpTargetPath, targetPath, true);
+                        if (fileChanged && !ext.TargetIsPDF) File.Copy(tmpTargetPath, targetPath, true);
                       }
                       catch (Exception ex)
                       {
@@ -405,7 +414,7 @@ namespace OfficeFileConverter
                   {
                     if (wb != null) wb.Close(false);
                   }
-                  if (_options.RemoveOriginal)
+                  if (_options.RemoveOriginal && fileChanged)
                   {
                     try
                     {
@@ -443,6 +452,7 @@ namespace OfficeFileConverter
                         File.Copy(tmpTargetPath + target, targetPath + target);
                         File.Delete(tmpTargetPath + target);
                       }
+                      fileChanged = true;
                     }
                     else
                     {
@@ -451,18 +461,20 @@ namespace OfficeFileConverter
                         tmpTargetPath += ".xltm";
                         targetPath += ".xltm";
                         wb.SaveAs(tmpTargetPath, XlFileFormat.xlOpenXMLTemplateMacroEnabled);
+                        fileChanged = true;
                       }
                       else
                       {
                         tmpTargetPath += ".xltx";
                         targetPath += ".xltx";
                         wb.SaveAs(tmpTargetPath, XlFileFormat.xlOpenXMLTemplate);
+                        fileChanged = true;
                       }
                       try
                       {
                         wb.Close(false);
                         wb = null;
-                        File.Copy(tmpTargetPath, targetPath, true);
+                        if (fileChanged && !ext.TargetIsPDF) File.Copy(tmpTargetPath, targetPath, true);
                       }
                       catch (Exception ex)
                       {
@@ -482,7 +494,7 @@ namespace OfficeFileConverter
                   {
                     if (wb != null) wb.Close(false);
                   }
-                  if (_options.RemoveOriginal)
+                  if (_options.RemoveOriginal && fileChanged)
                   {
                     try
                     {
@@ -541,6 +553,7 @@ namespace OfficeFileConverter
                 }
               case "mdb":
                 {
+                  if (!_options.ConvertAccess) return;
                   Log.Debug("Processing Access DB");
                   CreateAccessApp();
                   try
