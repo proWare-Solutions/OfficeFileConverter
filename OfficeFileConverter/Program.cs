@@ -1,29 +1,31 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using CommandLine;
-
+﻿using CommandLine;
 using Microsoft.Office.Interop.Access;
 using Microsoft.Office.Interop.Excel;
 using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Interop.Visio;
 using Microsoft.Office.Interop.Word;
+using OfficeFileConverter.Ppt;
+using OpenMcdf;
+using OpenMcdf.Extensions;
+using OpenMcdf.Extensions.OLEProperties;
 using Serilog;
+using System;
+using System.Collections.Generic;
 using System.IO;
-using Path = System.IO.Path;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices.ComTypes;
+using System.Text;
+using System.Threading.Tasks;
 using Access = Microsoft.Office.Interop.Access.Application;
 using Excel= Microsoft.Office.Interop.Excel.Application;
+using Path = System.IO.Path;
 using PowerPoint = Microsoft.Office.Interop.PowerPoint.Application;
 using Visio = Microsoft.Office.Interop.Visio.Application;
+using VisioDoc = Microsoft.Office.Interop.Visio.Document;
 using Word = Microsoft.Office.Interop.Word.Application;
 using WordDoc = Microsoft.Office.Interop.Word.Document;
-using VisioDoc = Microsoft.Office.Interop.Visio.Document;
-using Microsoft.Office.Interop.Access.Dao;
-using System.Net.NetworkInformation;
-using System.Globalization;
+
 
 namespace OfficeFileConverter
 {
@@ -176,6 +178,37 @@ namespace OfficeFileConverter
       return false;
     }
 
+    static bool IsWordOrExcelEncrypted(string path)
+    {
+      // Open structured storage files
+      using (CompoundFile cf = new CompoundFile(path, CFSUpdateMode.ReadOnly, CFSConfiguration.Default))
+      {
+        CFStream ds;
+        if (cf.RootStorage.TryGetStream("\u0005SummaryInformation", out ds))
+        {
+          OLEPropertiesContainer props = ds.AsOLEPropertiesContainer();
+          foreach (var prop in props.Properties)
+          {
+            if (prop.PropertyIdentifier == 19)
+            {
+              return (int)prop.Value == 1;
+            }
+          }
+        }
+        
+      }
+      return false;
+    }
+
+    static bool IsPowerPointEncrypted(string path)
+    {
+      using (CompoundFile cf = new CompoundFile(path, CFSUpdateMode.ReadOnly, CFSConfiguration.Default))
+      {
+        Binary binary = new Binary(cf);
+        return binary.Encrypted;
+      }
+    }
+
     static void ProcessFile(string filePath)
     {
       try
@@ -216,6 +249,11 @@ namespace OfficeFileConverter
             {
               case "doc":
                 {
+                  if (IsWordOrExcelEncrypted(tmpPath))
+                  {
+                    Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    return;
+                  }
                   Log.Debug("Processing Word document");
                   CreateWordApp();
                   WordDoc doc = _word.Documents.Open(tmpPath);
@@ -282,6 +320,11 @@ namespace OfficeFileConverter
                 }
               case "dot":
                 {
+                  if (IsWordOrExcelEncrypted(tmpPath))
+                  {
+                    Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    return;
+                  }
                   Log.Debug("Processing Word template");
                   CreateWordApp();
                   WordDoc doc = _word.Documents.Open(tmpPath);
@@ -349,6 +392,11 @@ namespace OfficeFileConverter
                 }
               case "xls":
                 {
+                  if (IsWordOrExcelEncrypted(tmpPath))
+                  {
+                    Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    return;
+                  }
                   Log.Debug("Processing Excel workbook");
                   CreateExcelApp();
                   Workbook wb = _excel.Workbooks.Open(tmpPath);
@@ -429,6 +477,11 @@ namespace OfficeFileConverter
                 }
               case "xlt":
                 {
+                  if (IsWordOrExcelEncrypted(tmpPath))
+                  {
+                    Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    return;
+                  }
                   Log.Debug("Processing Excel template");
                   CreateExcelApp();
                   Workbook wb = _excel.Workbooks.Open(tmpPath);
@@ -509,6 +562,11 @@ namespace OfficeFileConverter
                 }
               case "xla":
                 {
+                  if (IsWordOrExcelEncrypted(tmpPath))
+                  {
+                    Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    return;
+                  }
                   Log.Debug("Processing Excel addin");
                   CreateExcelApp();
                   Workbook wb = _excel.Workbooks.Open(tmpPath);
@@ -788,6 +846,11 @@ namespace OfficeFileConverter
                 }
               case "ppt":
                 {
+                  if (IsPowerPointEncrypted(tmpPath))
+                  {
+                    Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    return;
+                  }
                   Log.Debug("Processing PowerPoint presentation");
                   CreatePptApp();
                   Presentation presentation = _powerPoint.Presentations.Open(tmpPath,Microsoft.Office.Core.MsoTriState.msoFalse, Microsoft.Office.Core.MsoTriState.msoFalse, Microsoft.Office.Core.MsoTriState.msoFalse);
@@ -851,6 +914,11 @@ namespace OfficeFileConverter
                 }
               case "pot":
                 {
+                  if (IsPowerPointEncrypted(tmpPath))
+                  {
+                    Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    return;
+                  }
                   Log.Debug("Processing PowerPoint template");
                   CreatePptApp();
                   Presentation presentation = _powerPoint.Presentations.Open(tmpPath);
@@ -914,6 +982,11 @@ namespace OfficeFileConverter
                 }
               case "pps":
                 {
+                  if (IsPowerPointEncrypted(tmpPath))
+                  {
+                    Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    return;
+                  }
                   Log.Debug("Processing PowerPoint show");
                   CreatePptApp();
                   Presentation presentation = _powerPoint.Presentations.Open(tmpPath);
