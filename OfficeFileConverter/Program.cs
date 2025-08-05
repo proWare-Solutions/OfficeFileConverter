@@ -698,7 +698,9 @@ namespace OfficeFileConverter
                   }
                   break;
                 }
+              case "vdx":
               case "vsd":
+              case "vdw":
                 {
                   Log.Debug("Processing Visio drawing");
                   CreateVisioApp();
@@ -769,6 +771,7 @@ namespace OfficeFileConverter
                   }
                   break;
                 }
+              case "vtx":
               case "vst":
                 {
                   Log.Debug("Processing Visio template");
@@ -841,6 +844,7 @@ namespace OfficeFileConverter
                   break;
                 }
               case "vss":
+              case "vsx":
                 {
                   Log.Debug("Processing Visio drawing");
                   CreateVisioApp();
@@ -899,6 +903,79 @@ namespace OfficeFileConverter
                     if (doc != null) doc.Close();
                   }
                   if (_options.RemoveOriginal && fileChanged)
+                  {
+                    try
+                    {
+                      File.Delete(filePath);
+                    }
+                    catch (Exception ex)
+                    {
+                      throw new ConvertException($"Could not remove original file: {ex.Message}", ex, ActionStatus.OriginalRemoveFailed);
+                    }
+                  }
+                  break;
+                }
+              case "ppa":
+                {
+                  if (IsPowerPointEncrypted(tmpPath))
+                  {
+                    Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    _filesEncrypted.AppendLine(filePath);
+                    return;
+                  }
+                  Log.Debug("Processing PowerPoint Add-In");
+                  CreatePptApp();
+                  Presentation presentation = _powerPoint.Presentations.Open(tmpPath, Microsoft.Office.Core.MsoTriState.msoFalse, Microsoft.Office.Core.MsoTriState.msoFalse, Microsoft.Office.Core.MsoTriState.msoFalse);
+                  try
+                  {
+                    if (ext.TargetIsPDF)
+                    {
+                      tmpTargetPath += ".pdf";
+                      targetPath += ".pdf";
+                      presentation.SaveCopyAs(tmpTargetPath, PpSaveAsFileType.ppSaveAsPDF);
+                    }
+                    else
+                    {
+                      if (presentation.HasVBProject)
+                      {
+                        targetPath += ".ppam";
+                        tmpTargetPath += ".ppam";
+                      }
+                      else
+                      {
+                        targetPath += ".ppax";
+                        tmpTargetPath += ".ppax";
+                      }
+                      presentation.SaveAs(tmpTargetPath);
+                    }
+                    presentation.Close();
+                    presentation = null;
+                    try
+                    {
+                      File.Copy(tmpTargetPath, targetPath, true);
+                    }
+                    catch (Exception ex)
+                    {
+                      throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
+                    }
+                    finally
+                    {
+                      File.Delete(tmpTargetPath);
+                    }
+                  }
+                  catch (ConvertException)
+                  {
+                    throw;
+                  }
+                  catch (Exception ex)
+                  {
+                    throw new ConvertException($"Could not save new file '{tmpTargetPath}': {ex.Message}", ex, ActionStatus.SaveFailed);
+                  }
+                  finally
+                  {
+                    if (presentation != null) presentation.Close();
+                  }
+                  if (_options.RemoveOriginal)
                   {
                     try
                     {
