@@ -38,6 +38,11 @@ namespace OfficeFileConverter
     private static Word _word;
     private static Visio _visio;
 
+    private static StringBuilder _filesInUse = new StringBuilder();
+    private static StringBuilder _filesEncrypted = new StringBuilder();
+    private static StringBuilder _filesFailed = new StringBuilder();
+    private static StringBuilder _filesNotConverted = new StringBuilder();
+
     static void Main(string[] args)
     {
       DateTime start = DateTime.Now;
@@ -71,8 +76,8 @@ namespace OfficeFileConverter
         options.Logpath = Path.Combine(options.Logpath, options.CurrentRunTime);
         if (!Directory.Exists(options.Logpath)) Directory.CreateDirectory(options.Logpath);
         options.ActionStatusFile = Path.Combine(options.Logpath, "status.csv");
-        options.Logpath= System.IO.Path.Combine(options.Logpath, "Scan.log");
-        conf.WriteTo.File(options.Logpath + ".log", shared: true);
+        string log = System.IO.Path.Combine(options.Logpath, "Scan.log");
+        conf.WriteTo.File(log, shared: true);
       }
       Log.Logger = conf.CreateLogger();
       _options.ConvertSettings = new ConvertSettings();
@@ -99,6 +104,13 @@ namespace OfficeFileConverter
         }
           ProcessFileList();
         }
+      if (!string.IsNullOrEmpty(_options.ActionStatusFile)) File.WriteAllText(_options.ActionStatusFile, _filesNotConverted.ToString());
+      if (!string.IsNullOrWhiteSpace(options.Logpath))
+      {
+        if (_filesInUse.Length > 0) File.WriteAllText(Path.Combine(options.Logpath, "FilesInUse.txt"), _filesInUse.ToString());
+        if (_filesEncrypted.Length > 0) File.WriteAllText(Path.Combine(options.Logpath, "FilesEncrypted.txt"), _filesEncrypted.ToString());
+        if (_filesFailed.Length > 0) File.WriteAllText(Path.Combine(options.Logpath, "FilesFailed.txt"), _filesFailed.ToString());
+      }
       if (_access!=null) _access.Quit();
       if (_excel!=null) _excel.Quit();
       if (_powerPoint!=null) _powerPoint.Quit();
@@ -230,6 +242,7 @@ namespace OfficeFileConverter
           if (IsFileLocked(filePath))
           {
             Log.Information($"File {filePath} is in use and cannot be processed");
+            _filesInUse.AppendLine(filePath);
             return;
           }
           _options.FilesProcessed++;
@@ -252,6 +265,7 @@ namespace OfficeFileConverter
                   if (IsWordOrExcelEncrypted(tmpPath))
                   {
                     Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    _filesEncrypted.AppendLine(filePath);
                     return;
                   }
                   Log.Debug("Processing Word document");
@@ -291,18 +305,25 @@ namespace OfficeFileConverter
                     }
                     catch (Exception ex)
                     {
+                      fileChanged = false;
                       throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
-                      }
+                    }
                     finally
                     {
                       File.Delete(tmpTargetPath);
                     }
                   }
+                  catch (ConvertException)
+                  {
+                    throw;
+                  }
                   catch (Exception ex)
                   {
+
                     throw new ConvertException($"Could not save new file '{tmpTargetPath}': {ex.Message}", ex, ActionStatus.SaveFailed);
                   }
-                  finally { 
+                  finally 
+                  { 
                     if (doc!= null) doc.Close(false); 
                   }
                   if (_options.RemoveOriginal && fileChanged)
@@ -323,6 +344,7 @@ namespace OfficeFileConverter
                   if (IsWordOrExcelEncrypted(tmpPath))
                   {
                     Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    _filesEncrypted.AppendLine(filePath);
                     return;
                   }
                   Log.Debug("Processing Word template");
@@ -362,12 +384,17 @@ namespace OfficeFileConverter
                     }
                     catch (Exception ex)
                     {
+                      fileChanged = false;
                       throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
                     }
                     finally
                     {
                       File.Delete(tmpTargetPath);
                     }
+                  }
+                  catch (ConvertException)
+                  {
+                    throw;
                   }
                   catch (Exception ex)
                   {
@@ -395,6 +422,7 @@ namespace OfficeFileConverter
                   if (IsWordOrExcelEncrypted(tmpPath))
                   {
                     Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    _filesEncrypted.AppendLine(filePath);
                     return;
                   }
                   Log.Debug("Processing Excel workbook");
@@ -446,6 +474,7 @@ namespace OfficeFileConverter
                       }
                       catch (Exception ex)
                       {
+                        fileChanged = false;
                         throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
                       }
                       finally
@@ -453,6 +482,10 @@ namespace OfficeFileConverter
                         File.Delete(tmpTargetPath);
                       }
                     }
+                  }
+                  catch (ConvertException)
+                  {
+                    throw;
                   }
                   catch (Exception ex)
                   {
@@ -480,6 +513,7 @@ namespace OfficeFileConverter
                   if (IsWordOrExcelEncrypted(tmpPath))
                   {
                     Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    _filesEncrypted.AppendLine(filePath);
                     return;
                   }
                   Log.Debug("Processing Excel template");
@@ -531,6 +565,7 @@ namespace OfficeFileConverter
                       }
                       catch (Exception ex)
                       {
+                        fileChanged = false;
                         throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
                       }
                       finally
@@ -538,6 +573,10 @@ namespace OfficeFileConverter
                         File.Delete(tmpTargetPath);
                       }
                     }
+                  }
+                  catch (ConvertException)
+                  {
+                    throw;
                   }
                   catch (Exception ex)
                   {
@@ -565,6 +604,7 @@ namespace OfficeFileConverter
                   if (IsWordOrExcelEncrypted(tmpPath))
                   {
                     Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    _filesEncrypted.AppendLine(filePath);
                     return;
                   }
                   Log.Debug("Processing Excel addin");
@@ -578,6 +618,7 @@ namespace OfficeFileConverter
                   }
                   catch (Exception ex)
                   {
+                    fileChanged = false;
                     throw new ConvertException($"Could not save new file '{tmpTargetPath}': {ex.Message}", ex, ActionStatus.SaveFailed);
                   }
                   finally
@@ -585,10 +626,12 @@ namespace OfficeFileConverter
                     wb.Close(false);
                     try
                     {
-                      File.Copy(tmpTargetPath, targetPath, true);
+                      if (fileChanged)
+                        File.Copy(tmpTargetPath, targetPath, true);
                     }
                     catch (Exception ex)
                     {
+                      fileChanged = false;
                       throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
                     }
                     finally
@@ -596,7 +639,7 @@ namespace OfficeFileConverter
                       File.Delete(tmpTargetPath);
                     }
                   }
-                  if (_options.RemoveOriginal)
+                  if (_options.RemoveOriginal && fileChanged)
                   {
                     try
                     {
@@ -622,9 +665,11 @@ namespace OfficeFileConverter
                     try
                     {
                       File.Copy(tmpTargetPath, targetPath, true);
+                      fileChanged = true;
                     }
                     catch (Exception ex)
                     {
+                      fileChanged = false;
                       throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
                     }
                     finally
@@ -632,11 +677,15 @@ namespace OfficeFileConverter
                       File.Delete(tmpTargetPath);
                     }
                   }
+                  catch (ConvertException)
+                  {
+                    throw;
+                  }
                   catch (Exception ex)
                   {
                     throw new ConvertException($"Could not save new file '{tmpTargetPath}': {ex.Message}", ex, ActionStatus.SaveFailed);
                   }
-                  if (_options.RemoveOriginal)
+                  if (_options.RemoveOriginal && fileChanged)
                   {
                     try
                     {
@@ -683,15 +732,21 @@ namespace OfficeFileConverter
                     try
                     {
                       File.Copy(tmpTargetPath, targetPath, true);
+                      fileChanged = true;
                     }
                     catch (Exception ex)
                     {
+                      fileChanged = false;
                       throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
                     }
                     finally
                     {
                       File.Delete(tmpTargetPath);
                     }
+                  }
+                  catch (ConvertException)
+                  {
+                    throw;
                   }
                   catch (Exception ex)
                   {
@@ -701,7 +756,7 @@ namespace OfficeFileConverter
                   {
                     if (doc != null) doc.Close();
                   }
-                  if (_options.RemoveOriginal)
+                  if (_options.RemoveOriginal && fileChanged)
                   {
                     try
                     {
@@ -747,16 +802,22 @@ namespace OfficeFileConverter
                     doc = null;
                     try
                     {
+                      fileChanged = true;
                       File.Copy(tmpTargetPath, targetPath, true);
                     }
                     catch (Exception ex)
                     {
+                      fileChanged = false;
                       throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
                     }
                     finally
                     {
                       File.Delete(tmpTargetPath);
                     }
+                  }
+                  catch (ConvertException)
+                  {
+                    throw;
                   }
                   catch (Exception ex)
                   {
@@ -766,7 +827,7 @@ namespace OfficeFileConverter
                   {
                     if (doc != null) doc.Close();
                   }
-                  if (_options.RemoveOriginal)
+                  if (_options.RemoveOriginal && fileChanged)
                   {
                     try
                     {
@@ -813,15 +874,21 @@ namespace OfficeFileConverter
                     try
                     {
                       File.Copy(tmpTargetPath, targetPath, true);
+                      fileChanged = true;
                     }
                     catch (Exception ex)
                     {
+                      fileChanged = false;
                       throw new ConvertException($"Could not save new file {targetPath}: {ex.Message}", ex, ActionStatus.SaveFailed);
                     }
                     finally
                     {
                       File.Delete(tmpTargetPath);
                     }
+                  }
+                  catch (ConvertException)
+                  {
+                    throw;
                   }
                   catch (Exception ex)
                   {
@@ -831,7 +898,7 @@ namespace OfficeFileConverter
                   {
                     if (doc != null) doc.Close();
                   }
-                  if (_options.RemoveOriginal)
+                  if (_options.RemoveOriginal && fileChanged)
                   {
                     try
                     {
@@ -849,6 +916,7 @@ namespace OfficeFileConverter
                   if (IsPowerPointEncrypted(tmpPath))
                   {
                     Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    _filesEncrypted.AppendLine(filePath);
                     return;
                   }
                   Log.Debug("Processing PowerPoint presentation");
@@ -891,6 +959,10 @@ namespace OfficeFileConverter
                       File.Delete(tmpTargetPath);
                     }
                   }
+                  catch (ConvertException)
+                  {
+                    throw;
+                  }
                   catch (Exception ex)
                   {
                     throw new ConvertException($"Could not save new file '{tmpTargetPath}': {ex.Message}", ex, ActionStatus.SaveFailed);
@@ -917,6 +989,7 @@ namespace OfficeFileConverter
                   if (IsPowerPointEncrypted(tmpPath))
                   {
                     Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    _filesEncrypted.AppendLine(filePath);
                     return;
                   }
                   Log.Debug("Processing PowerPoint template");
@@ -959,6 +1032,10 @@ namespace OfficeFileConverter
                       File.Delete(tmpTargetPath);
                     }
                   }
+                  catch (ConvertException) 
+                  { 
+                    throw;
+                  }
                   catch (Exception ex)
                   {
                     throw new ConvertException($"Could not save new file '{tmpTargetPath}': {ex.Message}", ex, ActionStatus.SaveFailed);
@@ -985,6 +1062,7 @@ namespace OfficeFileConverter
                   if (IsPowerPointEncrypted(tmpPath))
                   {
                     Log.Information($"File {fileName} is encrypted and cannot be converted");
+                    _filesEncrypted.AppendLine(filePath);
                     return;
                   }
                   Log.Debug("Processing PowerPoint show");
@@ -1027,6 +1105,10 @@ namespace OfficeFileConverter
                       File.Delete(tmpTargetPath);
                     }
                   }
+                  catch (ConvertException)
+                  {
+                    throw;
+                  }
                   catch (Exception ex)
                   {
                     throw new ConvertException($"Could not save new file '{tmpTargetPath}': {ex.Message}", ex, ActionStatus.SaveFailed);
@@ -1052,11 +1134,13 @@ namespace OfficeFileConverter
           }
           catch (ConvertException ex)
           {
-            if (!string.IsNullOrEmpty(_options.ActionStatusFile)) File.AppendAllText(_options.ActionStatusFile, $"File {fileName} process with result {ex.Status}" + Environment.NewLine);
+            _filesNotConverted.AppendLine($"File {filePath} process with result {ex.Status}");
+            _filesFailed.AppendLine(filePath);
           }
           catch
           {
-            if (!string.IsNullOrEmpty(_options.ActionStatusFile)) File.AppendAllText(_options.ActionStatusFile, $"File {fileName} process with result {ActionStatus.Unknown}" + Environment.NewLine);
+            _filesNotConverted.AppendLine($"File {filePath} process with result {ActionStatus.Unknown}");
+            _filesFailed.AppendLine(filePath);
           }
           finally 
           {
@@ -1071,6 +1155,7 @@ namespace OfficeFileConverter
       catch (Exception ex)
       {
         Log.Error($"Error processing file '{filePath}': {ex.Message}");
+        _filesFailed.AppendLine(filePath);
       }
 
     }
